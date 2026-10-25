@@ -89,6 +89,7 @@ class FortuneRequest(BaseModel):
     user_id: int
     user_name: str
     question: str
+    cards: list = []  # <--- ДОБАВЬ ЭТУ СТРОЧКУ
 
 class PayRequest(BaseModel):
     user_id: int
