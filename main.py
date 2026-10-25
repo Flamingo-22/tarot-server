@@ -58,9 +58,11 @@ def ask_yandex_gpt(messages):
         response = requests.post(url, headers=headers, json=data, timeout=30)
         if response.status_code == 200:
             return response.json()["result"]["alternatives"][0]["message"]["text"]
-        return "Карты сегодня молчат..."
+        else:
+            # ВОЗВРАЩАЕМ ТОЧНЫЙ ОТВЕТ ОТ ЯНДЕКСА
+            return f"ОШИБКА ЯНДЕКСА (Код {response.status_code}): {response.text}"
     except Exception as e:
-        return f"Ошибка ИИ: {e}"
+        return f"ОШИБКА СЕРВЕРА: {e}"
 
 # --- API ДЛЯ РАСКЛАДА ---
 @app.post("/api/fortune")
