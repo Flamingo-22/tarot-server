@@ -46,7 +46,7 @@ ALL_TAROT_CARDS = [
     "Паж Пентаклей", "Рыцарь Пентаклей", "Королева Пентаклей", "Король Пентаклей"
 ]
 
-BASE_IMG_URL = "https://raw.githubusercontent.com/ecsplendid/Rider-Waite-Tarot/master/cards/"
+BASE_IMG_URL = "https://cdn.jsdelivr.net/gh/ecsplendid/Rider-Waite-Tarot@master/cards/"
 
 CARD_IMAGES = {
     "Шут": "00_fool.jpg", "Маг": "01_magician.jpg", "Верховная Жрица": "02_high_priestess.jpg",
