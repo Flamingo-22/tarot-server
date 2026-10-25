@@ -1,5 +1,6 @@
 import os
 import requests
+import random
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -42,6 +43,39 @@ ALL_TAROT_CARDS = [
     "Туз Пентаклей", "Двойка Пентаклей", "Тройка Пентаклей", "Четверка Пентаклей", "Пятерка Пентаклей", "Шестерка Пентаклей", "Семерка Пентаклей", "Восьмерка Пентаклей", "Девятка Пентаклей", "Десятка Пентаклей", "Паж Пентаклей", "Рыцарь Пентаклей", "Королева Пентаклей", "Король Пентаклей"
 ]
 
+# --- СЛОВАРЬ ССЫЛОК НА КАРТИНКИ (ВСЕ 78 КАРТ) ---
+BASE_IMG_URL = "https://raw.githubusercontent.com/ecsplendid/Rider-Waite-Tarot/master/cards/"
+
+CARD_IMAGES = {
+    "Шут": "00_fool.jpg", "Маг": "01_magician.jpg", "Верховная Жрица": "02_high_priestess.jpg",
+    "Императрица": "03_empress.jpg", "Император": "04_emperor.jpg", "Иерофант": "05_hierophant.jpg",
+    "Влюбленные": "06_lovers.jpg", "Колесница": "07_chariot.jpg", "Сила": "08_strength.jpg",
+    "Отшельник": "09_hermit.jpg", "Колесо Фортуны": "10_wheel_of_fortune.jpg", "Справедливость": "11_justice.jpg",
+    "Повешенный": "12_hanged_man.jpg", "Смерть": "13_death.jpg", "Умеренность": "14_temperance.jpg",
+    "Дьявол": "15_devil.jpg", "Башня": "16_tower.jpg", "Звезда": "17_star.jpg", "Луна": "18_moon.jpg",
+    "Солнце": "19_sun.jpg", "Суд": "20_judgement.jpg", "Мир": "21_world.jpg",
+    "Туз Жезлов": "wands01.jpg", "Двойка Жезлов": "wands02.jpg", "Тройка Жезлов": "wands03.jpg",
+    "Четверка Жезлов": "wands04.jpg", "Пятерка Жезлов": "wands05.jpg", "Шестерка Жезлов": "wands06.jpg",
+    "Семерка Жезлов": "wands07.jpg", "Восьмерка Жезлов": "wands08.jpg", "Девятка Жезлов": "wands09.jpg",
+    "Десятка Жезлов": "wands10.jpg", "Паж Жезлов": "wands11.jpg", "Рыцарь Жезлов": "wands12.jpg",
+    "Королева Жезлов": "wands13.jpg", "Король Жезлов": "wands14.jpg",
+    "Туз Кубков": "cups01.jpg", "Двойка Кубков": "cups02.jpg", "Тройка Кубков": "cups03.jpg",
+    "Четверка Кубков": "cups04.jpg", "Пятерка Кубков": "cups05.jpg", "Шестерка Кубков": "cups06.jpg",
+    "Семерка Кубков": "cups07.jpg", "Восьмерка Кубков": "cups08.jpg", "Девятка Кубков": "cups09.jpg",
+    "Десятка Кубков": "cups10.jpg", "Паж Кубков": "cups11.jpg", "Рыцарь Кубков": "cups12.jpg",
+    "Королева Кубков": "cups13.jpg", "Король Кубков": "cups14.jpg",
+    "Туз Мечей": "swords01.jpg", "Двойка Мечей": "swords02.jpg", "Тройка Мечей": "swords03.jpg",
+    "Четверка Мечей": "swords04.jpg", "Пятерка Мечей": "swords05.jpg", "Шестерка Мечей": "swords06.jpg",
+    "Семерка Мечей": "swords07.jpg", "Восьмерка Мечей": "swords08.jpg", "Девятка Мечей": "swords09.jpg",
+    "Десятка Мечей": "swords10.jpg", "Паж Мечей": "swords11.jpg", "Рыцарь Мечей": "swords12.jpg",
+    "Королева Мечей": "swords13.jpg", "Король Мечей": "swords14.jpg",
+    "Туз Пентаклей": "pentacles01.jpg", "Двойка Пентаклей": "pentacles02.jpg", "Тройка Пентаклей": "pentacles03.jpg",
+    "Четверка Пентаклей": "pentacles04.jpg", "Пятерка Пентаклей": "pentacles05.jpg", "Шестерка Пентаклей": "pentacles06.jpg",
+    "Семерка Пентаклей": "pentacles07.jpg", "Восьмерка Пентаклей": "pentacles08.jpg", "Девятка Пентаклей": "pentacles09.jpg",
+    "Десятка Пентаклей": "pentacles10.jpg", "Паж Пентаклей": "pentacles11.jpg", "Рыцарь Пентаклей": "pentacles12.jpg",
+    "Королева Пентаклей": "pentacles13.jpg", "Король Пентаклей": "pentacles14.jpg"
+}
+
 class ChatRequest(BaseModel):
     user_id: int
     user_name: str
@@ -72,7 +106,6 @@ def ask_yandex_gpt(messages):
     except Exception as e:
         return f"Ошибка ИИ: {e}"
 
-# Новый эндпоинт для получения баланса
 @app.get("/api/balance/{user_id}")
 async def get_balance(user_id: int):
     balance = db.get_user_balance(user_id)
@@ -80,7 +113,6 @@ async def get_balance(user_id: int):
 
 @app.post("/api/fortune")
 async def get_fortune(data: FortuneRequest):
-    # Создаем пользователя, если его нет
     user = db.get_user(data.user_id, data.user_name)
     balance = user[2]
     is_free = db.can_get_free_fortune(data.user_id)
@@ -95,9 +127,11 @@ async def get_fortune(data: FortuneRequest):
         db.update_balance(data.user_id, -1)
         cost_msg = "💸 Списано 1 токен"
 
-    # ЗАГАДОЧНЫЙ ПРОМПТ ДЛЯ ИИ
+    # ВЫБИРАЕМ 3 СЛУЧАЙНЫЕ КАРТЫ ИЗ 78
+    selected_cards = random.sample(ALL_TAROT_CARDS, 3)
+
     prompt = f"""Пользователь спрашивает: '{data.question}'.
-Выпали карты: {', '.join(data.cards)}.
+Выпали карты: {', '.join(selected_cards)}.
 
 Ты — глубокий и загадочный таролог. Твоя задача — дать толкование, которое звучит мудро и оставляет пространство для размышлений. 
 Не давай прямых и однозначных ответов (вроде "да" или "нет"). Используй метафоры, говори о скрытых энергиях и внутренних ощущениях клиента. 
@@ -110,13 +144,27 @@ async def get_fortune(data: FortuneRequest):
     
     reading = ask_yandex_gpt(messages)
 
-    # Сохраняем в чат
     db.clear_chat(data.user_id)
-    db.save_message(data.user_id, "user", f"Вопрос: {data.question}. Карты: {', '.join(data.cards)}")
+    db.save_message(data.user_id, "user", f"Вопрос: {data.question}. Карты: {', '.join(selected_cards)}")
     db.save_message(data.user_id, "assistant", reading)
-    db.set_chat_status(data.user_id, True, data.cards)
+    db.set_chat_status(data.user_id, True, selected_cards)
     
-    return {"status": "ok", "reading": reading, "cost": cost_msg, "new_balance": db.get_user_balance(data.user_id)}
+    # Формируем список карт с картинками для отправки на сайт
+    cards_data = []
+    for card in selected_cards:
+        image_filename = CARD_IMAGES.get(card, "back.jpg")
+        cards_data.append({
+            "name": card,
+            "image": BASE_IMG_URL + image_filename
+        })
+
+    return {
+        "status": "ok", 
+        "reading": reading, 
+        "cost": cost_msg, 
+        "new_balance": db.get_user_balance(data.user_id),
+        "cards": cards_data  # <--- ОТПРАВЛЯЕМ КАРТИНКИ НА САЙТ
+    }
 
 @app.post("/api/chat")
 async def chat_with_tarot(data: ChatRequest):
@@ -148,7 +196,6 @@ async def start_cmd(message: types.Message):
     args = message.text.split()
     referrer_id = None
     
-    # Обработка реферальной ссылки
     if len(args) > 1 and args[1].startswith("ref_"):
         try:
             referrer_id = int(args[1].replace("ref_", ""))
