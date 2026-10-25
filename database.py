@@ -7,18 +7,16 @@ DB_NAME = "tarot_bot.db"
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    # Пользователи
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             first_name TEXT,
-            balance REAL DEFAULT 10.0, -- Дадим 10 токенов на тесты
+            balance REAL DEFAULT 10.0,
             last_free_fortune DATE,
             chat_active INTEGER DEFAULT 0,
             current_cards TEXT
         )
     ''')
-    # История чата
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS chat_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,6 +35,7 @@ def get_user(user_id, first_name="Пользователь"):
     user = cursor.fetchone()
     
     if not user:
+        # Если пользователя нет, создаем его с балансом 10 токенов
         cursor.execute("INSERT INTO users (user_id, first_name) VALUES (?, ?)", (user_id, first_name))
         conn.commit()
         cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
@@ -44,6 +43,14 @@ def get_user(user_id, first_name="Пользователь"):
     
     conn.close()
     return user
+
+def get_user_balance(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+    return res[0] if res else 0
 
 def update_balance(user_id, amount):
     conn = sqlite3.connect(DB_NAME)
@@ -71,7 +78,6 @@ def mark_free_fortune_used(user_id):
     conn.commit()
     conn.close()
 
-# Работа с чатом
 def save_message(user_id, role, text):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -85,7 +91,6 @@ def get_chat_history(user_id, limit=6):
     cursor.execute("SELECT role, text FROM chat_history WHERE user_id = ? ORDER BY id DESC LIMIT ?", (user_id, limit))
     rows = cursor.fetchall()
     conn.close()
-    # Возвращаем в хронологическом порядке
     return [{"role": r[0], "text": r[1]} for r in reversed(rows)]
 
 def clear_chat(user_id):
