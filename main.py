@@ -1,6 +1,6 @@
 import os
-import requests
 import random
+import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -23,27 +23,30 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
 FOLDER_ID = os.getenv("FOLDER_ID")
 WEBAPP_URL = os.getenv("WEBAPP_URL")
+NTFY_TOPIC = os.getenv("NTFY_TOPIC", "toochat-orders-1066139530-7xk9")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# --- ПОЛНЫЙ СПИСОК КАРТ (78 ШТУК) ---
+# ---------- 78 карт ----------
 ALL_TAROT_CARDS = [
-    # Старшие Арканы (22)
     "Шут", "Маг", "Верховная Жрица", "Императрица", "Император", "Иерофант",
     "Влюбленные", "Колесница", "Сила", "Отшельник", "Колесо Фортуны", "Справедливость",
     "Повешенный", "Смерть", "Умеренность", "Дьявол", "Башня", "Звезда", "Луна", "Солнце", "Суд", "Мир",
-    # Младшие Арканы: Жезлы (14)
-    "Туз Жезлов", "Двойка Жезлов", "Тройка Жезлов", "Четверка Жезлов", "Пятерка Жезлов", "Шестерка Жезлов", "Семерка Жезлов", "Восьмерка Жезлов", "Девятка Жезлов", "Десятка Жезлов", "Паж Жезлов", "Рыцарь Жезлов", "Королева Жезлов", "Король Жезлов",
-    # Младшие Арканы: Кубки (14)
-    "Туз Кубков", "Двойка Кубков", "Тройка Кубков", "Четверка Кубков", "Пятерка Кубков", "Шестерка Кубков", "Семерка Кубков", "Восьмерка Кубков", "Девятка Кубков", "Десятка Кубков", "Паж Кубков", "Рыцарь Кубков", "Королева Кубков", "Король Кубков",
-    # Младшие Арканы: Мечи (14)
-    "Туз Мечей", "Двойка Мечей", "Тройка Мечей", "Четверка Мечей", "Пятерка Мечей", "Шестерка Мечей", "Семерка Мечей", "Восьмерка Мечей", "Девятка Мечей", "Десятка Мечей", "Паж Мечей", "Рыцарь Мечей", "Королева Мечей", "Король Мечей",
-    # Младшие Арканы: Пентакли (14)
-    "Туз Пентаклей", "Двойка Пентаклей", "Тройка Пентаклей", "Четверка Пентаклей", "Пятерка Пентаклей", "Шестерка Пентаклей", "Семерка Пентаклей", "Восьмерка Пентаклей", "Девятка Пентаклей", "Десятка Пентаклей", "Паж Пентаклей", "Рыцарь Пентаклей", "Королева Пентаклей", "Король Пентаклей"
+    "Туз Жезлов", "Двойка Жезлов", "Тройка Жезлов", "Четверка Жезлов", "Пятерка Жезлов", "Шестерка Жезлов",
+    "Семерка Жезлов", "Восьмерка Жезлов", "Девятка Жезлов", "Десятка Жезлов", "Паж Жезлов", "Рыцарь Жезлов",
+    "Королева Жезлов", "Король Жезлов",
+    "Туз Кубков", "Двойка Кубков", "Тройка Кубков", "Четверка Кубков", "Пятерка Кубков", "Шестерка Кубков",
+    "Семерка Кубков", "Восьмерка Кубков", "Девятка Кубков", "Десятка Кубков", "Паж Кубков", "Рыцарь Кубков",
+    "Королева Кубков", "Король Кубков",
+    "Туз Мечей", "Двойка Мечей", "Тройка Мечей", "Четверка Мечей", "Пятерка Мечей", "Шестерка Мечей",
+    "Семерка Мечей", "Восьмерка Мечей", "Девятка Мечей", "Десятка Мечей", "Паж Мечей", "Рыцарь Мечей",
+    "Королева Мечей", "Король Мечей",
+    "Туз Пентаклей", "Двойка Пентаклей", "Тройка Пентаклей", "Четверка Пентаклей", "Пятерка Пентаклей",
+    "Шестерка Пентаклей", "Семерка Пентаклей", "Восьмерка Пентаклей", "Девятка Пентаклей", "Десятка Пентаклей",
+    "Паж Пентаклей", "Рыцарь Пентаклей", "Королева Пентаклей", "Король Пентаклей"
 ]
 
-# --- СЛОВАРЬ ССЫЛОК НА КАРТИНКИ (ВСЕ 78 КАРТ) ---
 BASE_IMG_URL = "https://raw.githubusercontent.com/ecsplendid/Rider-Waite-Tarot/master/cards/"
 
 CARD_IMAGES = {
@@ -76,6 +79,7 @@ CARD_IMAGES = {
     "Королева Пентаклей": "pentacles13.jpg", "Король Пентаклей": "pentacles14.jpg"
 }
 
+# ---------- модели ----------
 class ChatRequest(BaseModel):
     user_id: int
     user_name: str
@@ -85,8 +89,12 @@ class FortuneRequest(BaseModel):
     user_id: int
     user_name: str
     question: str
-    cards: list
 
+class PayRequest(BaseModel):
+    user_id: int
+    user_name: str
+
+# ---------- YandexGPT ----------
 def ask_yandex_gpt(messages):
     try:
         url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
@@ -106,6 +114,18 @@ def ask_yandex_gpt(messages):
     except Exception as e:
         return f"Ошибка ИИ: {e}"
 
+# ---------- ntfy ----------
+def send_ntfy_notification(message: str):
+    try:
+        requests.post(
+            f"https://ntfy.sh/{NTFY_TOPIC}",
+            data=message.encode("utf-8"),
+            timeout=10
+        )
+    except Exception:
+        pass
+
+# ---------- API ----------
 @app.get("/api/balance/{user_id}")
 async def get_balance(user_id: int):
     balance = db.get_user_balance(user_id)
@@ -127,43 +147,41 @@ async def get_fortune(data: FortuneRequest):
         db.update_balance(data.user_id, -1)
         cost_msg = "💸 Списано 1 токен"
 
-    # ВЫБИРАЕМ 3 СЛУЧАЙНЫЕ КАРТЫ ИЗ 78
     selected_cards = random.sample(ALL_TAROT_CARDS, 3)
 
     prompt = f"""Пользователь спрашивает: '{data.question}'.
 Выпали карты: {', '.join(selected_cards)}.
 
-Ты — глубокий и загадочный таролог. Твоя задача — дать толкование, которое звучит мудро и оставляет пространство для размышлений. 
-Не давай прямых и однозначных ответов (вроде "да" или "нет"). Используй метафоры, говори о скрытых энергиях и внутренних ощущениях клиента. 
+Ты — глубокий и загадочный таролог. Твоя задача — дать толкование, которое звучит мудро и оставляет пространство для размышлений.
+Не давай прямых и однозначных ответов (вроде "да" или "нет"). Используй метафоры, говори о скрытых энергиях и внутренних ощущениях клиента.
 Ответ должен быть на русском, объемом 150-200 слов. Разбери карты в контексте вопроса и дай совет, который заставит человека задуматься."""
 
     messages = [
         {"role": "system", "text": "Ты — таролог. Ты говоришь загадками и помогаешь человеку самому найти ответ."},
         {"role": "user", "text": prompt}
     ]
-    
+
     reading = ask_yandex_gpt(messages)
 
     db.clear_chat(data.user_id)
     db.save_message(data.user_id, "user", f"Вопрос: {data.question}. Карты: {', '.join(selected_cards)}")
     db.save_message(data.user_id, "assistant", reading)
     db.set_chat_status(data.user_id, True, selected_cards)
-    
-    # Формируем список карт с картинками для отправки на сайт
+
     cards_data = []
     for card in selected_cards:
-        image_filename = CARD_IMAGES.get(card, "back.jpg")
+        filename = CARD_IMAGES.get(card, "back.jpg")
         cards_data.append({
             "name": card,
-            "image": BASE_IMG_URL + image_filename
+            "image": BASE_IMG_URL + filename
         })
 
     return {
-        "status": "ok", 
-        "reading": reading, 
-        "cost": cost_msg, 
+        "status": "ok",
+        "reading": reading,
+        "cost": cost_msg,
         "new_balance": db.get_user_balance(data.user_id),
-        "cards": cards_data  # <--- ОТПРАВЛЯЕМ КАРТИНКИ НА САЙТ
+        "cards": cards_data
     }
 
 @app.post("/api/chat")
@@ -177,25 +195,31 @@ async def chat_with_tarot(data: ChatRequest):
             return {"status": "error", "message": "Для начала чата нужно 3 токена."}
         db.update_balance(data.user_id, -3)
         db.set_chat_status(data.user_id, True)
-    
+
     db.save_message(data.user_id, "user", data.text)
     history = db.get_chat_history(data.user_id, limit=6)
-    
+
     messages = [{"role": "system", "text": "Ты таролог. Продолжай диалог с клиентом, опираясь на предыдущий расклад. Твои ответы должны быть туманными и глубокими."}]
     for msg in history:
         messages.append({"role": msg["role"], "text": msg["text"]})
-    
+
     reply = ask_yandex_gpt(messages)
     db.save_message(data.user_id, "assistant", reply)
-    
+
     return {"status": "ok", "reply": reply, "new_balance": db.get_user_balance(data.user_id)}
 
-# --- БОТ ---
+@app.post("/api/pay")
+async def notify_payment(data: PayRequest):
+    msg = f"Гость {data.user_id} ({data.user_name}) заявил об оплате. Проверьте перевод."
+    send_ntfy_notification(msg)
+    return {"status": "ok", "message": "Уведомление отправлено. Ожидайте зачисления."}
+
+# ---------- бот ----------
+CARD_NUMBER = "2204 3212 5674 4475"
+
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
     args = message.text.split()
-    referrer_id = None
-    
     if len(args) > 1 and args[1].startswith("ref_"):
         try:
             referrer_id = int(args[1].replace("ref_", ""))
@@ -203,22 +227,23 @@ async def start_cmd(message: types.Message):
                 db.update_balance(referrer_id, 1.0)
                 try:
                     await bot.send_message(referrer_id, "🎉 По вашей ссылке пришел друг! Вам начислен 1 токен.")
-                except:
+                except Exception:
                     pass
         except ValueError:
             pass
 
     db.get_user(message.from_user.id, message.from_user.first_name)
-    
+
     web_app = WebAppInfo(url=WEBAPP_URL)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🔮 Открыть гадалку", web_app=web_app)],
-        [InlineKeyboardButton(text="💰 Мой баланс", callback_data="balance")]
+        [InlineKeyboardButton(text="💰 Мой баланс", callback_data="balance")],
+        [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="topup")]
     ])
-    
+
     await message.answer(
-        f"Привет, {message.from_user.first_name}! 👋\n\nЯ твой проводник в мир Таро. Загадай вопрос, и карты дадут ответ.\n\n"
-        f"🎁 Твой первый расклад сегодня — бесплатный!", 
+        f"Привет, {message.from_user.first_name}! 👋\n\nЯ твой проводник в мир Таро.\n\n"
+        f"🎁 Первый расклад сегодня — бесплатный!",
         reply_markup=keyboard
     )
 
@@ -226,6 +251,28 @@ async def start_cmd(message: types.Message):
 async def show_balance(callback: types.CallbackQuery):
     balance = db.get_user_balance(callback.from_user.id)
     await callback.message.answer(f"💰 Ваш баланс: {balance} токенов.\n\n1 токен = 10 руб.")
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "topup")
+async def show_topup(callback: types.CallbackQuery):
+    text = (
+        f"💳 **Пополнение баланса**\n\n"
+        f"Переведите любую сумму на карту:\n\n"
+        f"`{2200010102501486}`\n\n"
+        f"1 токен = 10 руб.\n\n"
+        f"После перевода нажмите кнопку ниже."
+    )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Я оплатил", callback_data="paid")]
+    ])
+    await callback.message.answer(text, parse_mode="Markdown", reply_markup=keyboard)
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data == "paid")
+async def confirm_payment(callback: types.CallbackQuery):
+    msg = f"Гость {callback.from_user.id} ({callback.from_user.first_name}) заявил об оплате. Проверьте перевод."
+    send_ntfy_notification(msg)
+    await callback.message.answer("✅ Уведомление отправлено. После проверки баланс будет зачислен.")
     await callback.answer()
 
 @app.on_event("startup")
