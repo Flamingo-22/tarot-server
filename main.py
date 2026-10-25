@@ -13,6 +13,8 @@ import asyncio
 import database as db
 
 app = FastAPI()
+
+# Разрешаем запросы с твоего GitHub Pages
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -86,7 +88,7 @@ async def get_fortune(data: FortuneRequest):
     ]
     reading = ask_yandex_gpt(messages)
 
-    # Сохраняем в историю и включаем режим чата (стоит 3 токена при старте)
+    # Сохраняем в историю
     db.clear_chat(data.user_id)
     db.save_message(data.user_id, "user", f"Вопрос: {data.question}. Карты: {', '.join(data.cards)}")
     db.save_message(data.user_id, "assistant", reading)
@@ -99,30 +101,22 @@ async def get_fortune(data: FortuneRequest):
 async def chat_with_tarot(data: ChatRequest):
     user = db.get_user(data.user_id, data.user_name)
     balance = user[2]
-
-    # Проверяем, активен ли чат. Если нет — списываем 3 токена за старт
     chat_active = user[4]
+
     if not chat_active:
         if balance < 3:
             return {"status": "error", "message": "Для начала чата нужно 3 токена."}
         db.update_balance(data.user_id, -3)
         db.set_chat_status(data.user_id, True)
     
-    # Сохраняем сообщение пользователя
     db.save_message(data.user_id, "user", data.text)
-    
-    # Получаем историю (последние 6 сообщений)
     history = db.get_chat_history(data.user_id, limit=6)
     
-    # Формируем запрос к ИИ с контекстом
     messages = [{"role": "system", "text": "Ты таролог. Продолжай диалог с клиентом, опираясь на предыдущий расклад."}]
     for msg in history:
         messages.append({"role": msg["role"], "text": msg["text"]})
     
-    # Получаем ответ
     reply = ask_yandex_gpt(messages)
-    
-    # Сохраняем ответ ИИ
     db.save_message(data.user_id, "assistant", reply)
     
     return {"status": "ok", "reply": reply}
