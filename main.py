@@ -161,12 +161,12 @@ def card_image_url(card_name: str) -> str:
         return CARD_BACK_URL
     return BASE_IMG_URL + path
 
-async def notify_admin_telegram(text: str):
+async def notify_admin_telegram(text: str, keyboard=None):
     """Помимо ntfy — уведомление админу в личку Telegram."""
     if not ADMIN_ID:
         return
     try:
-        await bot.send_message(ADMIN_ID, text)
+        await bot.send_message(ADMIN_ID, text, reply_markup=keyboard)
     except Exception as e:
         print(f"[admin notify] {e}")
 
@@ -309,6 +309,12 @@ def back_to_main_keyboard():
 def back_to_topup_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_topup")]
+    ])
+
+def admin_payment_keyboard(payment_id: int):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"admin_confirm_{payment_id}"),
+         InlineKeyboardButton(text="❌ Отменить", callback_data=f"admin_cancel_{payment_id}")]
     ])
 
 # ================= /start =================
@@ -488,11 +494,10 @@ async def cb_paid(callback: types.CallbackQuery):
     admin_msg = (
         f"💳 Новый платёж #{payment_id}\n"
         f"Пользователь: {payment['user_name']} (ID: {payment['user_id']})\n"
-        f"Сумма: {payment['amount_rub']:g} ₽ ({payment['tokens']:g} токенов)\n"
-        f"Переведите /cancel_{payment_id} чтобы отменить, /confirm_{payment_id} — подтвердить досрочно."
+        f"Сумма: {payment['amount_rub']:g} ₽ ({payment['tokens']:g} токенов)"
     )
     send_ntfy_notification(admin_msg)
-    asyncio.create_task(notify_admin_telegram(admin_msg))
+    asyncio.create_task(notify_admin_telegram(admin_msg, admin_payment_keyboard(payment_id)))
 
     async def auto_confirm(pid: int):
         await asyncio.sleep(180)
@@ -513,6 +518,61 @@ async def cb_paid(callback: types.CallbackQuery):
     PENDING_PAYMENTS[payment_id] = task
 
     await callback.answer("Платёж принят, ожидайте.")
+
+@dp.callback_query(lambda c: c.data.startswith("admin_confirm_"))
+async def admin_cb_confirm(callback: types.CallbackQuery):
+    if not ADMIN_ID or callback.from_user.id != ADMIN_ID:
+        await callback.answer("Нет прав", show_alert=True)
+        return
+
+    pid = int(callback.data.replace("admin_confirm_", ""))
+    
+    task = PENDING_PAYMENTS.pop(pid, None)
+    if task:
+        task.cancel()
+
+    result = db.confirm_payment(pid)
+    if not result or result.get("status") != "confirmed":
+        await callback.answer("Платёж уже обработан или не найден.", show_alert=True)
+        await callback.message.edit_text("⚠️ Платёж уже был обработан ранее.")
+        return
+
+    await callback.message.edit_text(f"✅ Платёж #{pid} подтверждён вручную.")
+    try:
+        await bot.send_message(
+            result["user_id"],
+            f"✅ Оплата подтверждена! Начислено {result['tokens']:g} токенов."
+        )
+    except Exception:
+        pass
+
+@dp.callback_query(lambda c: c.data.startswith("admin_cancel_"))
+async def admin_cb_cancel(callback: types.CallbackQuery):
+    if not ADMIN_ID or callback.from_user.id != ADMIN_ID:
+        await callback.answer("Нет прав", show_alert=True)
+        return
+
+    pid = int(callback.data.replace("admin_cancel_", ""))
+    
+    task = PENDING_PAYMENTS.pop(pid, None)
+    if task:
+        task.cancel()
+
+    payment = db.get_payment(pid)
+    if not payment:
+        await callback.answer("Платёж не найден.", show_alert=True)
+        await callback.message.edit_text("⚠️ Платёж не найден.")
+        return
+
+    db.cancel_payment(pid)
+    await callback.message.edit_text(f"❌ Платёж #{pid} отменён.")
+    try:
+        await bot.send_message(
+            payment["user_id"],
+            "❌ К сожалению, платёж не подтверждён. Если вы перевели средства — напишите в поддержку."
+        )
+    except Exception:
+        pass
 
 @dp.message(Command(commands=["confirm"]))
 async def admin_confirm_payment(message: types.Message):
