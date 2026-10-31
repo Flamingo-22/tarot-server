@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 import asyncio
 import database as db
@@ -24,6 +24,9 @@ YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
 FOLDER_ID = os.getenv("FOLDER_ID")
 WEBAPP_URL = os.getenv("WEBAPP_URL")
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "toochat-orders-1066139530-7xk9")
+
+# 🔐 Telegram user_id администратора (задать в env на Render)
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -46,10 +49,16 @@ ALL_TAROT_CARDS = [
     "Паж Пентаклей", "Рыцарь Пентаклей", "Королева Пентаклей", "Король Пентаклей"
 ]
 
-BASE_IMG_URL = "https://cdn.jsdelivr.net/gh/look-fate/tarot-lab@main/SimpleTarotPng/"
+# 🌐 Базовый URL картинок. Меняется в env, без правки кода.
+BASE_IMG_URL = os.getenv(
+    "BASE_IMG_URL",
+    "https://cdn.jsdelivr.net/gh/look-fate/tarot-lab@main/SimpleTarotPng/"
+)
+# 🂠 Красивая «рубашка» — на случай, если фото не загрузилось
+CARD_BACK_URL = os.getenv("CARD_BACK_URL", BASE_IMG_URL + "back.jpg")
 
 CARD_IMAGES = {
-    # Старшие Арканы (Major Arcana)
+    # Старшие Арканы
     "Шут": "Major_Arcana/Major_00.jpg",
     "Маг": "Major_Arcana/Major_01.jpg",
     "Верховная Жрица": "Major_Arcana/Major_02.jpg",
@@ -72,8 +81,7 @@ CARD_IMAGES = {
     "Солнце": "Major_Arcana/Major_19.jpg",
     "Суд": "Major_Arcana/Major_20.jpg",
     "Мир": "Major_Arcana/Major_21.jpg",
-
-    # Жезлы (Wands)
+    # Жезлы
     "Туз Жезлов": "Wands/Wands_01.jpg",
     "Двойка Жезлов": "Wands/Wands_02.jpg",
     "Тройка Жезлов": "Wands/Wands_03.jpg",
@@ -88,8 +96,7 @@ CARD_IMAGES = {
     "Рыцарь Жезлов": "Wands/Wands_12.jpg",
     "Королева Жезлов": "Wands/Wands_13.jpg",
     "Король Жезлов": "Wands/Wands_14.jpg",
-
-    # Кубки (Cups)
+    # Кубки
     "Туз Кубков": "Cups/Cups_01.jpg",
     "Двойка Кубков": "Cups/Cups_02.jpg",
     "Тройка Кубков": "Cups/Cups_03.jpg",
@@ -104,8 +111,7 @@ CARD_IMAGES = {
     "Рыцарь Кубков": "Cups/Cups_12.jpg",
     "Королева Кубков": "Cups/Cups_13.jpg",
     "Король Кубков": "Cups/Cups_14.jpg",
-
-    # Мечи (Swords)
+    # Мечи
     "Туз Мечей": "Swords/Swords_01.jpg",
     "Двойка Мечей": "Swords/Swords_02.jpg",
     "Тройка Мечей": "Swords/Swords_03.jpg",
@@ -120,8 +126,7 @@ CARD_IMAGES = {
     "Рыцарь Мечей": "Swords/Swords_12.jpg",
     "Королева Мечей": "Swords/Swords_13.jpg",
     "Король Мечей": "Swords/Swords_14.jpg",
-
-    # Пентакли (Pentacles / Pents)
+    # Пентакли
     "Туз Пентаклей": "Pents/Pents_01.jpg",
     "Двойка Пентаклей": "Pents/Pents_02.jpg",
     "Тройка Пентаклей": "Pents/Pents_03.jpg",
@@ -135,8 +140,7 @@ CARD_IMAGES = {
     "Паж Пентаклей": "Pents/Pents_11.jpg",
     "Рыцарь Пентаклей": "Pents/Pents_12.jpg",
     "Королева Пентаклей": "Pents/Pents_13.jpg",
-    "Король Пентаклей": "Pents/Pents_14.jpg"
-
+    "Король Пентаклей": "Pents/Pents_14.jpg",
 }
 
 class ChatRequest(BaseModel):
@@ -148,7 +152,7 @@ class FortuneRequest(BaseModel):
     user_id: int
     user_name: str
     question: str
-    cards: list = []   # <-- единственное добавление к твоей рабочей модели
+    cards: list = []
 
 class PayRequest(BaseModel):
     user_id: int
@@ -179,9 +183,19 @@ def send_ntfy_notification(message: str):
     except Exception:
         pass
 
+def card_image_url(card_name: str) -> str:
+    path = CARD_IMAGES.get(card_name)
+    if not path:
+        return CARD_BACK_URL
+    return BASE_IMG_URL + path
+
 @app.get("/api/balance/{user_id}")
 async def get_balance(user_id: int):
     return {"balance": db.get_user_balance(user_id)}
+
+@app.get("/api/card-back")
+async def get_card_back():
+    return {"url": CARD_BACK_URL}
 
 @app.post("/api/fortune")
 async def get_fortune(data: FortuneRequest):
@@ -222,7 +236,7 @@ async def get_fortune(data: FortuneRequest):
     for card in selected_cards:
         cards_data.append({
             "name": card,
-            "image": BASE_IMG_URL + CARD_IMAGES.get(card, "back.jpg")
+            "image": card_image_url(card)
         })
 
     return {
@@ -288,7 +302,8 @@ async def start_cmd(message: types.Message):
     ])
     await message.answer(
         f"Привет, {message.from_user.first_name}! 👋\n\nЗагадай вопрос, и карты дадут ответ.\n\n"
-        f"🎁 Первый расклад сегодня — бесплатный!",
+        f"🎁 Первый расклад сегодня — бесплатный!\n"
+        f"✨ Новым гостям дарим 3 приветственных токена.",
         reply_markup=keyboard
     )
 
@@ -314,6 +329,40 @@ async def confirm_payment(callback: types.CallbackQuery):
     send_ntfy_notification(f"Гость {callback.from_user.id} ({callback.from_user.first_name}) заявил об оплате. Проверьте перевод.")
     await callback.message.answer("✅ Уведомление отправлено. После проверки баланс будет зачислен.")
     await callback.answer()
+
+# 🔐 Админ-команда: /add_balance <user_id> <amount>
+@dp.message(Command("add_balance"))
+async def admin_add_balance(message: types.Message):
+    if not ADMIN_ID or message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ У вас нет прав на эту команду.")
+        return
+
+    parts = message.text.split()
+    if len(parts) != 3:
+        await message.answer("Использование: `/add_balance <user_id> <amount>`", parse_mode="Markdown")
+        return
+
+    try:
+        target_id = int(parts[1])
+        amount = float(parts[2])
+    except ValueError:
+        await message.answer("❌ user_id должен быть числом, amount — числом. Пример: `/add_balance 123456789 5`", parse_mode="Markdown")
+        return
+
+    new_balance = db.add_balance_manual(target_id, amount, admin_id=message.from_user.id)
+    if new_balance is None:
+        await message.answer(f"⚠️ Пользователь с ID {target_id} не найден в базе.")
+        return
+
+    await message.answer(f"✅ Начислено {amount} токенов пользователю {target_id}.\nНовый баланс: {new_balance}")
+
+    try:
+        await bot.send_message(
+            target_id,
+            f"💎 Вам начислено {amount} токенов!\nТекущий баланс: {new_balance}.\nСпасибо, что с нами ✨"
+        )
+    except Exception:
+        pass
 
 @app.on_event("startup")
 async def on_startup():
