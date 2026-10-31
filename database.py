@@ -5,8 +5,8 @@ from datetime import date
 DB_NAME = "tarot_bot.db"
 
 # 🎁 Приветственный бонус для новых пользователей
-WELCOME_BONUS = 3.0
-DEFAULT_BALANCE = 10.0
+WELCOME_BONUS = 0.0
+DEFAULT_BALANCE = 3.0
 
 # 🎁 Бонус за приглашённого друга
 REFERRAL_BONUS = 2.0
