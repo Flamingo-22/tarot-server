@@ -52,7 +52,7 @@ ALL_TAROT_CARDS = [
 # 🌐 Базовый URL картинок. Меняется в env, без правки кода.
 BASE_IMG_URL = os.getenv(
     "BASE_IMG_URL",
-    "https://cdn.jsdelivr.net/gh/look-fate/tarot-lab@main/SimpleTarotPng/"
+    "https://cdn.jsdelivr.net/gh/Flamingo-22/tarot-cards@main/"
 )
 # 🂠 Красивая «рубашка» — на случай, если фото не загрузилось
 CARD_BACK_URL = os.getenv("CARD_BACK_URL", BASE_IMG_URL + "back.jpg")
