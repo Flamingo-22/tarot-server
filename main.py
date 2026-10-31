@@ -109,9 +109,7 @@ CARD_IMAGES = {
 }
 
 # 🆕 Хранилище для отложенных подтверждений платежей (в памяти процесса)
-# {payment_id: asyncio.Task}
 PENDING_PAYMENTS = {}
-
 
 # ================= Pydantic-модели =================
 
@@ -129,7 +127,6 @@ class FortuneRequest(BaseModel):
 class PayRequest(BaseModel):
     user_id: int
     user_name: str
-
 
 # ================= YandexGPT =================
 
@@ -152,20 +149,17 @@ def ask_yandex_gpt(messages):
     except Exception as e:
         return f"Ошибка ИИ: {e}"
 
-
 def send_ntfy_notification(message: str):
     try:
         requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=message.encode("utf-8"), timeout=10)
     except Exception:
         pass
 
-
 def card_image_url(card_name: str) -> str:
     path = CARD_IMAGES.get(card_name)
     if not path:
         return CARD_BACK_URL
     return BASE_IMG_URL + path
-
 
 async def notify_admin_telegram(text: str):
     """Помимо ntfy — уведомление админу в личку Telegram."""
@@ -175,7 +169,6 @@ async def notify_admin_telegram(text: str):
         await bot.send_message(ADMIN_ID, text)
     except Exception as e:
         print(f"[admin notify] {e}")
-
 
 # ================= REST API (как было) =================
 
@@ -245,7 +238,6 @@ async def get_fortune(data: FortuneRequest):
         "cards": cards_data
     }
 
-
 async def _notify_referrer_about_reward(referrer_id: int):
     try:
         await bot.send_message(
@@ -255,7 +247,6 @@ async def _notify_referrer_about_reward(referrer_id: int):
         )
     except Exception as e:
         print(f"[notify referrer] {e}")
-
 
 @app.post("/api/chat")
 async def chat_with_tarot(data: ChatRequest):
@@ -281,13 +272,11 @@ async def chat_with_tarot(data: ChatRequest):
 
     return {"status": "ok", "reply": reply, "new_balance": db.get_user_balance(data.user_id)}
 
-
 @app.post("/api/pay")
 async def notify_payment(data: PayRequest):
     """Старый эндпоинт из Mini App — оставлен для совместимости."""
     send_ntfy_notification(f"Гость {data.user_id} ({data.user_name}) заявил об оплате. Проверьте перевод.")
     return {"status": "ok", "message": "Уведомление отправлено."}
-
 
 # ================= Telegram-клавиатуры =================
 
@@ -303,7 +292,6 @@ def main_menu_keyboard():
          InlineKeyboardButton(text="🆘 Поддержка", callback_data="menu_support")],
     ])
 
-
 def topup_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="5 токенов (50 ₽)", callback_data="pay_5"),
@@ -313,18 +301,15 @@ def topup_keyboard():
         [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="back_main")],
     ])
 
-
 def back_to_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="back_main")]
     ])
 
-
 def back_to_topup_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_topup")]
     ])
-
 
 # ================= /start =================
 
@@ -341,10 +326,8 @@ async def start_cmd(message: types.Message):
         except ValueError:
             pass
 
-    # 🆕 get_user сам создаст пользователя (с 2 токенами, если по реф. ссылке)
     db.get_user(message.from_user.id, message.from_user.first_name, referred_by=referred_by)
 
-    # 🆕 Ежедневный бонус — начисляется при заходе
     daily_granted = db.claim_daily_bonus(message.from_user.id)
     daily_line = "🎁 Ежедневный бонус: +1 токен!" if daily_granted else "🎁 Ежедневный бонус уже получен сегодня."
 
@@ -359,7 +342,6 @@ async def start_cmd(message: types.Message):
     except Exception as e:
         print(f"[start] {e}")
 
-
 # ================= 💰 БАЛАНС =================
 
 @dp.callback_query(lambda c: c.data == "menu_balance")
@@ -370,16 +352,15 @@ async def cb_balance(callback: types.CallbackQuery):
             [InlineKeyboardButton(text="💳 Пополнить", callback_data="menu_topup")],
             [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="back_main")],
         ])
-               await callback.message.edit_text(
-            f"🆘 *Поддержка*\n\n"
-            f"Возникли вопросы? Напишите нам: {SUPPORT_USERNAME}",
+        await callback.message.edit_text(
+            f"💰 Ваш баланс: *{b:g} токенов*\n\n"
+            f"1 токен = {RUB_PER_TOKEN} руб.",
             parse_mode="Markdown",
             reply_markup=keyboard
         )
     except Exception as e:
-        print(f"[cb_support] {e}")
+        print(f"[cb_balance] {e}")
     await callback.answer()
-
 
 # ================= 💳 ПОПОЛНЕНИЕ =================
 
@@ -394,7 +375,6 @@ async def cb_topup_menu(callback: types.CallbackQuery):
     except Exception as e:
         print(f"[cb_topup] {e}")
     await callback.answer()
-
 
 async def _start_payment_flow(callback: types.CallbackQuery, tokens: float):
     """Создаёт платёж и показывает реквизиты."""
@@ -422,12 +402,10 @@ async def _start_payment_flow(callback: types.CallbackQuery, tokens: float):
         print(f"[payment flow] {e}")
     await callback.answer()
 
-
 @dp.callback_query(lambda c: c.data in ("pay_5", "pay_6", "pay_10"))
 async def cb_pay_preset(callback: types.CallbackQuery):
     tokens = int(callback.data.replace("pay_", ""))
     await _start_payment_flow(callback, tokens)
-
 
 @dp.callback_query(lambda c: c.data == "pay_custom")
 async def cb_pay_custom(callback: types.CallbackQuery):
@@ -442,11 +420,12 @@ async def cb_pay_custom(callback: types.CallbackQuery):
         print(f"[custom] {e}")
     await callback.answer()
 
-
 @dp.message()
 async def handle_custom_amount(message: types.Message):
     """Ловим текстовый ввод суммы токенов (только если число)."""
     if not message.text:
+        return
+    if message.text.startswith("/"):
         return
     text = message.text.strip()
     if not text.replace(".", "", 1).isdigit():
@@ -482,7 +461,6 @@ async def handle_custom_amount(message: types.Message):
     except Exception as e:
         print(f"[custom payment] {e}")
 
-
 @dp.callback_query(lambda c: c.data.startswith("paid_"))
 async def cb_paid(callback: types.CallbackQuery):
     try:
@@ -507,7 +485,6 @@ async def cb_paid(callback: types.CallbackQuery):
     except Exception as e:
         print(f"[cb_paid edit] {e}")
 
-    # Уведомления админу
     admin_msg = (
         f"💳 Новый платёж #{payment_id}\n"
         f"Пользователь: {payment['user_name']} (ID: {payment['user_id']})\n"
@@ -517,7 +494,6 @@ async def cb_paid(callback: types.CallbackQuery):
     send_ntfy_notification(admin_msg)
     asyncio.create_task(notify_admin_telegram(admin_msg))
 
-    # ⏰ Отложенное подтверждение через 3 минуты
     async def auto_confirm(pid: int):
         await asyncio.sleep(180)
         result = db.confirm_payment(pid)
@@ -538,13 +514,11 @@ async def cb_paid(callback: types.CallbackQuery):
 
     await callback.answer("Платёж принят, ожидайте.")
 
-
 @dp.message(Command(commands=["confirm"]))
 async def admin_confirm_payment(message: types.Message):
     """Ручное подтверждение платежа админом: /confirm_<id>"""
     if not ADMIN_ID or message.from_user.id != ADMIN_ID:
         return
-    # aiogram разбирает /confirm_5 как команду confirm с аргументом
     parts = message.text.split("_")
     if len(parts) != 2 or not parts[1].isdigit():
         await message.answer("Использование: /confirm_<payment_id>")
@@ -571,7 +545,6 @@ async def admin_confirm_payment(message: types.Message):
         )
     except Exception:
         pass
-
 
 @dp.message(Command(commands=["cancel"]))
 async def admin_cancel_payment(message: types.Message):
@@ -603,7 +576,6 @@ async def admin_cancel_payment(message: types.Message):
     except Exception:
         pass
 
-
 # ================= 👥 РЕФЕРАЛЫ =================
 
 @dp.callback_query(lambda c: c.data == "menu_referral")
@@ -633,7 +605,6 @@ async def cb_referral(callback: types.CallbackQuery):
         print(f"[cb_referral] {e}")
     await callback.answer()
 
-
 # ================= 🎁 ЕЖЕДНЕВНЫЙ БОНУС =================
 
 @dp.callback_query(lambda c: c.data == "menu_daily")
@@ -661,7 +632,6 @@ async def cb_daily(callback: types.CallbackQuery):
     except Exception as e:
         print(f"[cb_daily] {e}")
 
-
 # ================= ⭐ ОТЗЫВЫ / 🆘 ПОДДЕРЖКА =================
 
 @dp.callback_query(lambda c: c.data == "menu_reviews")
@@ -681,7 +651,6 @@ async def cb_reviews(callback: types.CallbackQuery):
         print(f"[cb_reviews] {e}")
     await callback.answer()
 
-
 @dp.callback_query(lambda c: c.data == "menu_support")
 async def cb_support(callback: types.CallbackQuery):
     try:
@@ -695,10 +664,9 @@ async def cb_support(callback: types.CallbackQuery):
             parse_mode="Markdown",
             reply_markup=keyboard
         )
-        except Exception as e:
+    except Exception as e:
         print(f"[cb_support] {e}")
     await callback.answer()
-
 
 # ================= ⬅️ НАЗАД В ГЛАВНОЕ МЕНЮ =================
 
@@ -712,8 +680,7 @@ async def cb_back_main(callback: types.CallbackQuery):
             reply_markup=main_menu_keyboard()
         )
     except Exception as e:
-        # Если edit_text не сработал (например, сообщение слишком старое/без изменений) —
-        # отправляем новое сообщение с тем же меню, чтобы кнопки не «исчезали»
+        # Если edit_text не сработал — отправляем новое сообщение
         print(f"[cb_back_main edit] {e}")
         try:
             await callback.message.answer(
@@ -725,6 +692,103 @@ async def cb_back_main(callback: types.CallbackQuery):
             print(f"[cb_back_main answer] {e2}")
     await callback.answer()
 
+# ================= 📝 ТЕКСТОВЫЕ КОМАНДЫ =================
+
+@dp.message(Command("help"))
+async def cmd_help(message: types.Message):
+    text = (
+        "🆘 *Помощь по боту*\n\n"
+        "🔮 /start — Главное меню\n"
+        "💰 /balance — Проверить баланс\n"
+        "💳 /topup — Пополнить баланс\n"
+        "👥 /invite — Пригласить друга\n"
+        "🎁 /daily — Ежедневный бонус\n"
+        "⭐ /reviews — Отзывы\n\n"
+        f"Поддержка: {SUPPORT_USERNAME}"
+    )
+    await message.answer(text, parse_mode="Markdown", reply_markup=main_menu_keyboard())
+
+@dp.message(Command("balance"))
+async def cmd_balance(message: types.Message):
+    b = db.get_user_balance(message.from_user.id)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💳 Пополнить", callback_data="menu_topup")],
+        [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="back_main")],
+    ])
+    await message.answer(
+        f"💰 Ваш баланс: *{b:g} токенов*\n\n"
+        f"1 токен = {RUB_PER_TOKEN} руб.",
+        parse_mode="Markdown",
+        reply_markup=keyboard
+    )
+
+@dp.message(Command("topup"))
+async def cmd_topup(message: types.Message):
+    await message.answer(
+        "💳 На сколько токенов хотите пополнить?\n\n"
+        f"1 токен = {RUB_PER_TOKEN} руб.",
+        reply_markup=topup_keyboard()
+    )
+
+@dp.message(Command("invite"))
+async def cmd_invite(message: types.Message):
+    try:
+        bot_username = (await bot.get_me()).username
+        link = f"https://t.me/{bot_username}?start=ref_{message.from_user.id}"
+        count = db.get_referral_count(message.from_user.id)
+        limit = db.MAX_REFERRALS
+
+        text = (
+            f"👥 *Приглашайте друзей и получайте токены!*\n\n"
+            f"За каждого друга, который сделает первый расклад, вы получаете +2 токена.\n"
+            f"Новый друг при регистрации получит 2 токена.\n\n"
+            f"Ваша ссылка:\n`{link}`\n\n"
+            f"Успешных приглашений: {count}/{limit}\n"
+        )
+        if count >= limit:
+            text += "\n⚠️ Лимит приглашений исчерпан."
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📤 Поделиться", url=f"https://t.me/share/url?url={link}&text=Попробуй%20Мистическое%20Таро!")],
+            [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="back_main")],
+        ])
+        await message.answer(text, parse_mode="Markdown", reply_markup=keyboard)
+    except Exception as e:
+        print(f"[cmd_invite] {e}")
+
+@dp.message(Command("daily"))
+async def cmd_daily(message: types.Message):
+    try:
+        granted = db.claim_daily_bonus(message.from_user.id)
+        if granted:
+            b = db.get_user_balance(message.from_user.id)
+            await message.answer(
+                f"🎁 Ежедневный бонус получен: *+1 токен!*\n\n"
+                f"💰 Текущий баланс: {b} токенов.\n"
+                f"Возвращайтесь завтра за новым бонусом!",
+                parse_mode="Markdown",
+                reply_markup=back_to_main_keyboard()
+            )
+        else:
+            await message.answer(
+                "Бонус на сегодня уже получен. Приходите завтра!",
+                reply_markup=back_to_main_keyboard()
+            )
+    except Exception as e:
+        print(f"[cmd_daily] {e}")
+
+@dp.message(Command("reviews"))
+async def cmd_reviews(message: types.Message):
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⭐ Перейти к отзывам", url=REVIEWS_URL)],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_main")],
+    ])
+    await message.answer(
+        "⭐ *Отзывы*\n\n"
+        "Мы будем рады вашему мнению! Поделитесь впечатлениями по ссылке ниже.",
+        parse_mode="Markdown",
+        reply_markup=keyboard
+    )
 
 # ================= 🚀 STARTUP =================
 
@@ -734,10 +798,9 @@ async def on_startup():
     asyncio.create_task(dp.start_polling(bot))
     print("[startup] Bot polling started")
 
-
 @app.on_event("shutdown")
 async def on_shutdown():
-    # Отменяем все отложенные задачи платежей, чтобы не было «висящих» корутин
+    # Отменяем все отложенные задачи платежей
     for pid, task in list(PENDING_PAYMENTS.items()):
         if not task.done():
             task.cancel()
@@ -748,7 +811,6 @@ async def on_shutdown():
     except Exception as e:
         print(f"[shutdown] {e}")
     print("[shutdown] Bot stopped")
-
 
 # ================= 🏁 ENTRYPOINT =================
 
