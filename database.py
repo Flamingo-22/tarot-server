@@ -4,6 +4,10 @@ from datetime import date
 
 DB_NAME = "tarot_bot.db"
 
+# 🎁 Приветственный бонус для новых пользователей
+WELCOME_BONUS = 3.0
+DEFAULT_BALANCE = 10.0
+
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -33,14 +37,18 @@ def get_user(user_id, first_name="Пользователь"):
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
     user = cursor.fetchone()
-    
+
     if not user:
-        # Если пользователя нет, создаем его с балансом 10 токенов
-        cursor.execute("INSERT INTO users (user_id, first_name) VALUES (?, ?)", (user_id, first_name))
+        # 🎁 Новый пользователь: базовый баланс + приветственный бонус
+        initial_balance = DEFAULT_BALANCE + WELCOME_BONUS
+        cursor.execute(
+            "INSERT INTO users (user_id, first_name, balance) VALUES (?, ?, ?)",
+            (user_id, first_name, initial_balance)
+        )
         conn.commit()
         cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
         user = cursor.fetchone()
-    
+
     conn.close()
     return user
 
@@ -59,16 +67,36 @@ def update_balance(user_id, amount):
     conn.commit()
     conn.close()
 
+def add_balance_manual(user_id, amount, admin_id=None):
+    """Ручное начисление админом. Возвращает новый баланс или None, если юзер не найден."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+    new_balance = row[0] + amount
+    cursor.execute("UPDATE users SET balance = ? WHERE user_id = ?", (new_balance, user_id))
+    conn.commit()
+    conn.close()
+    print(f"[ADMIN {admin_id}] Начислено {amount} токенов пользователю {user_id}. Новый баланс: {new_balance}")
+    return new_balance
+
 def can_get_free_fortune(user_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT last_free_fortune FROM users WHERE user_id = ?", (user_id,))
     res = cursor.fetchone()
     conn.close()
-    
+
     if res and res[0]:
-        if date.fromisoformat(res[0]) == date.today():
-            return False
+        try:
+            if date.fromisoformat(res[0]) == date.today():
+                return False
+        except (ValueError, TypeError):
+            # если в БД дата в битом формате — считаем, что бесплатный расклад доступен
+            return True
     return True
 
 def mark_free_fortune_used(user_id):
