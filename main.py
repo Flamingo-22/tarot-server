@@ -370,13 +370,14 @@ async def cb_balance(callback: types.CallbackQuery):
             [InlineKeyboardButton(text="💳 Пополнить", callback_data="menu_topup")],
             [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="back_main")],
         ])
-        await callback.message.edit_text(
-            f"💰 Ваш баланс: *{b}* токенов.\n\n1 токен = 10 руб.",
+               await callback.message.edit_text(
+            f"🆘 *Поддержка*\n\n"
+            f"Возникли вопросы? Напишите нам: {SUPPORT_USERNAME}",
             parse_mode="Markdown",
             reply_markup=keyboard
         )
     except Exception as e:
-        print(f"[cb_balance] {e}")
+        print(f"[cb_support] {e}")
     await callback.answer()
 
 
