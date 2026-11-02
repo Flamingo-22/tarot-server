@@ -26,12 +26,12 @@ FOLDER_ID = os.getenv("FOLDER_ID")
 WEBAPP_URL = os.getenv("WEBAPP_URL")
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "toochat-orders-1066139530-7xk9")
 
-# 🔐 Telegram user_id администратора (задать в env на Render)
+# 🔐 Telegram user_id администратора
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
 # 📞 Поддержка и отзывы
-SUPPORT_USERNAME = "@polinuksisi"
-REVIEWS_URL = os.getenv("REVIEWS_URL", "https://t.me/polinuksisi")
+SUPPORT_USERNAME = "@dooflamingogos" 
+REVIEWS_URL = os.getenv("REVIEWS_URL", "https://t.me/dooflamingogos")
 
 # 💳 Реквизиты
 CARD_NUMBER = "2200 0101 0250 1486"
@@ -227,7 +227,7 @@ async def get_fortune(data: FortuneRequest):
         referrer_id, rewarded = db.activate_referral(data.user_id)
         if referrer_id and rewarded:
             asyncio.create_task(_notify_referrer_about_reward(referrer_id))
-   except Exception as e:
+    except Exception as e:
         print(f"[referral activation] {e}")
 
     # 🆕 ОТПРАВКА УВЕДОМЛЕНИЯ ТЕБЕ В ТЕЛЕГРАМ
@@ -237,8 +237,8 @@ async def get_fortune(data: FortuneRequest):
         f"❓ Вопрос: {data.question}\n"
         f"🃏 Карты: {', '.join(selected_cards)}"
     ))
- 
-return {
+
+    return {
         "status": "ok",
         "reading": reading,
         "cost": cost_msg,
@@ -858,17 +858,13 @@ async def cmd_reviews(message: types.Message):
         reply_markup=keyboard
     )
 
-
-
 # ================= 🚀 STARTUP (WEBHOOK) =================
 
-# URL твоего сервера на Render (без слэша на конце!)
+# URL твоего сервера на Render
 RENDER_URL = "https://tarot-server-16jh.onrender.com"
 
 @app.on_event("startup")
 async def on_startup():
-    # Устанавливаем вебхук при каждом запуске сервера
-    # drop_pending_updates=True очищает старые зависшие сообщения
     await bot.set_webhook(f"{RENDER_URL}/webhook", drop_pending_updates=True)
     print(f"[startup] Webhook set to {RENDER_URL}/webhook")
 
@@ -884,7 +880,6 @@ async def webhook(request: dict):
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    # Отменяем все отложенные задачи платежей
     for pid, task in list(PENDING_PAYMENTS.items()):
         if not task.done():
             task.cancel()
@@ -896,8 +891,6 @@ async def on_shutdown():
     except Exception as e:
         print(f"[shutdown] {e}")
     print("[shutdown] Bot stopped")
-
-
 
 # ================= 🏁 ENTRYPOINT =================
 
