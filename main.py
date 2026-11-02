@@ -227,10 +227,18 @@ async def get_fortune(data: FortuneRequest):
         referrer_id, rewarded = db.activate_referral(data.user_id)
         if referrer_id and rewarded:
             asyncio.create_task(_notify_referrer_about_reward(referrer_id))
-    except Exception as e:
+   except Exception as e:
         print(f"[referral activation] {e}")
 
-    return {
+    # 🆕 ОТПРАВКА УВЕДОМЛЕНИЯ ТЕБЕ В ТЕЛЕГРАМ
+    asyncio.create_task(notify_admin_telegram(
+        f"🔮 Новый расклад!\n"
+        f"👤 Пользователь: {data.user_name} (ID: {data.user_id})\n"
+        f"❓ Вопрос: {data.question}\n"
+        f"🃏 Карты: {', '.join(selected_cards)}"
+    ))
+ 
+return {
         "status": "ok",
         "reading": reading,
         "cost": cost_msg,
