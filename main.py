@@ -850,13 +850,29 @@ async def cmd_reviews(message: types.Message):
         reply_markup=keyboard
     )
 
-# ================= 🚀 STARTUP =================
+
+
+# ================= 🚀 STARTUP (WEBHOOK) =================
+
+# URL твоего сервера на Render (без слэша на конце!)
+RENDER_URL = "https://tarot-server-16jh.onrender.com"
 
 @app.on_event("startup")
 async def on_startup():
-    # Запускаем поллинг бота в фоне, чтобы FastAPI продолжал работать
-    asyncio.create_task(dp.start_polling(bot))
-    print("[startup] Bot polling started")
+    # Устанавливаем вебхук при каждом запуске сервера
+    # drop_pending_updates=True очищает старые зависшие сообщения
+    await bot.set_webhook(f"{RENDER_URL}/webhook", drop_pending_updates=True)
+    print(f"[startup] Webhook set to {RENDER_URL}/webhook")
+
+@app.post("/webhook")
+async def webhook(request: dict):
+    """Эндпоинт, куда Telegram присылает сообщения."""
+    try:
+        update = types.Update(**request)
+        await dp.feed_update(bot, update)
+    except Exception as e:
+        print(f"[webhook error] {e}")
+    return {"ok": True}
 
 @app.on_event("shutdown")
 async def on_shutdown():
@@ -867,10 +883,13 @@ async def on_shutdown():
     PENDING_PAYMENTS.clear()
 
     try:
+        await bot.delete_webhook()
         await bot.session.close()
     except Exception as e:
         print(f"[shutdown] {e}")
     print("[shutdown] Bot stopped")
+
+
 
 # ================= 🏁 ENTRYPOINT =================
 
